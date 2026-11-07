@@ -1,1 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gorilla Tag - Desktop Edition</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#000;font-family:'Segoe UI',Tahoma,sans-serif;user-select:none}
+canvas{display:block}
 
+#instructions{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(5,5,20,0.92);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;color:#fff}
+#instructions h1{font-size:64px;color:#FFD700;text-shadow:0 0 30px #FF8C00,0 4px 8px rgba(0,0,0,0.5);margin-bottom:8px;letter-spacing:3px}
+#instructions .sub{font-size:20px;color:#aaa;margin-bottom:35px;font-style:italic}
+.controls-grid{display:grid;grid-template-columns:auto auto;gap:8px 24px;margin-bottom:35px;font-size:17px}
+.controls-grid .key{text-align:right;color:#FFD700;font-weight:bold;font-family:monospace;font-size:18px}
+.controls-grid .desc{text-align:left;color:#ccc}
+#startBtn{padding:16px 50px;font-size:22px;background:linear-gradient(135deg,#FF8C00,#FFD700);border:none;
+  border-radius:12px;cursor:pointer;color:#1a1a2e;font-weight:bold;transition:transform 0.2s,box-shadow 0.2s;
+  box-shadow:0 4px 20px rgba(255,165,0,0.4)}
+#startBtn:hover{transform:scale(1.08);box-shadow:0 6px 30px rgba(255,165,0,0.6)}
+.tip{color:#666;font-size:13px;margin-top:18px;max-width:500px;text-align:center;line-height:1.5}
+
+#hud{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;display:none}
+.hud-panel{position:absolute;background:rgba(0,0,0,0.55);color:#fff;padding:10px 16px;border-radius:10px;
+  font-size:14px;backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,0.08)}
+#velPanel{top:15px;left:15px}
+#scorePanel{top:15px;right:15px;font-size:18px;color:#FFD700}
+#timerPanel{top:15px;left:50%;transform:translateX(-50%);font-size:20px;font-family:monospace}
+#statusPanel{bottom:15px;left:15px;font-size:13px}
+#crosshair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:6px;height:6px;
+  background:rgba(255,255,255,0.4);border-radius:50%;pointer-events:none}
+.hand-ind{position:absolute;bottom:20px;padding:8px 16px;border-radius:8px;font-size:14px;font-weight:bold;
+  transition:all 0.15s}
+#leftInd{left:20px;background:rgba(68,136,255,0.25);border:2px solid #4488ff;color:#4488ff}
+#rightInd{right:20px;background:rgba(255,68,68,0.25);border:2px solid #ff4444;color:#ff4444}
+.hand-ind.grabbed{transform:scale(1.15)}
+#leftInd.grabbed{background:rgba(68,136,255,0.7);color:#fff;box-shadow:0 0 15px rgba(68,136,255,0.5)}
+#rightInd.grabbed{background:rgba(255,68,68,0.7);color:#fff;box-shadow:0 0 15px rgba(255,68,68,0.5)}
+
+#pauseMenu{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.75);
+  display:none;flex-direction:column;align-items:center;justify-content:center;z-index:50;color:#fff}
+#pauseMenu h2{font-size:52px;margin-bottom:25px;color:#FFD700}
+#pauseMenu p{font-size:18px;color:#aaa;margin:5px}
+
+#winScreen{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(5,5,20,0.9);
+  display:none;flex-direction:column;align-items:center;justify-content:center;z-index:60;color:#fff}
+#winScreen h2{font-size:52px;color:#FFD700;margin-bottom:15px}
+#winScreen p{font-size:22px;margin:8px;color:#ccc}
+#restartBtn{margin-top:25px;padding:14px 40px;font-size:18px;background:#FFD700;border:none;
+  border-radius:10px;cursor:pointer;font-weight:bold;pointer-events:all}
+</style>
+</head>
+<body>
+
+<!-- Instructions Screen -->
+<div id="instructions">
+  <h1>🦍 GORILLA TAG</h1>
+  <p class="sub">Desktop Edition — Move like a gorilla!</p>
+  <div class="controls-grid">
+    <span class="key">Left Click (hold)</span><span class="desc">Grab with Left Hand & push</span>
+    <span class="key">Right Click (hold)</span><span class="desc">Grab with Right Hand & push</span>
+    <span class="key">Mouse Movement</span><span class="desc">Look around / Push off surfaces</span>
+    <span class="key">Space</span><span class="desc">Reset position if stuck</span>
+    <span class="key">ESC</span><span class="desc">Pause game</span>
+  </div>
+  <button id="startBtn">▶ CLICK TO PLAY</button>
+  <p class="tip">Hold a mouse button to plant your hand on the nearest surface, then flick your mouse to launch yourself! Collect all 🍌 bananas as fast as you can. Use both hands together for huge jumps!</p>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-panel" id="velPanel">Speed: 0.0 m/s</div>
+  <div class="hud-panel" id="scorePanel">🍌 0 / 0</div>
+  <div class="hud-panel" id="timerPanel">00:00.0</div>
+  <div class="hud-panel" id="statusPanel">Airborne</div>
+  <div id="crosshair"></div>
+  <div class="hand-ind" id="leftInd">L Hand</div>
+  <div class="hand-ind" id="rightInd">R Hand</div>
+</div>
+
+<!-- Pause Menu -->
+<div id="pauseMenu">
+  <h2>⏸ PAUSED</h2>
+  <p>Click to resume</p>
+  <p style="margin-top:15px;font-size:14px;color:#666">Press SPACE to reset position</p>
+</div>
+
+<!-- Win Screen -->
+<div id="winScreen">
+  <h2>🎉 ALL BANANAS COLLECTED!</h2>
+  <p id="finalTime">Time: 00:00.0</p>
+  <p id="finalScore">Score: 0</p>
+  <button id="restartBtn">Play Again</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ============================================================
+// SECTION 1: CONFIGURATION & CONSTANTS
+// ============================================================
+const CFG = {
+    gravity: -22,
+    pushMultiplier: 2.8,
+    maxPushSpeed: 45,
+    airDrag: 0.997,
+    groundFriction: 0.88,
+    playerRadius: 0.4,
+    playerHeight: 1.5,
+    eyeHeight: 1.35,
+    handReach: 2.8,
+    cameraSmooth: 10,
+    bobAmount: 0.04,
+    bobSpeed: 12,
+    fallResetY: -30,
+    spawnPos: new THREE.Vector3(0, 2, 0)
+};
+
+// ============================================================
+// SECTION 2: GAME STATE
+// ============================================================
+let gameState = 'menu'; // menu, playing, paused, won
+let score = 0;
+let totalBananas = 0;
+let timerStart = 0;
+let elapsedTime = 0;
+
+const player = {
+    pos: CFG.spawnPos.clone(),
+    vel: new THREE.Vector3(),
+    grounded: false,
+    wasGrounded: false
+};
+
+const hands = {
+    left: { grabbing: false, contactPoint: null, normal: null, lastMouse: {x:0,y:0}, mesh: null },
+    right: { grabbing: false, contactPoint: null, normal: null, lastMouse: {x:0,y:0}, mesh: null }
+};
+
+const input = {
+    mouseX: 0, mouseY: 0,
+    dx: 0, dy: 0,
+    yaw: 0, pitch: 0,
+    leftDown: false, rightDown: false
+};
+
+// ============================================================
+// SECTION 3: AUDIO SYSTEM (Web Audio API)
+// ============================================================
+let audioCtx = null;
+
+function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playSound(type) {
+    if (!audioCtx) return;
+    try {
+        const now = audioCtx.currentTime;
+        if (type === 'push') {
+            // Whoosh sound using filtered noise
+            const dur = 0.15;
+            const bufSize = audioCtx.sampleRate * dur;
+            const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+            const data = buf.getChannelData(0);
+            for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i/bufSize);
+            const src = audioCtx.createBufferSource();
+            src.buffer = buf;
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'bandpass'; filter.frequency.value = 800; filter.Q.value = 1;
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+            src.connect(filter).connect(gain).connect(audioCtx.destination);
+            src.start(now); src.stop(now + dur);
+        } else if (type === 'land') {
+            // Thud using low oscillator
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine'; osc.frequency.setValueAtTime(80, now);
+            osc.frequency.exponentialRampToValueAtTime(30, now + 0.15);
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.4, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+            osc.connect(gain).connect(audioCtx.destination);
+            osc.start(now); osc.stop(now + 0.2);
+        } else if (type === 'collect') {
+            // Bright ding
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine'; osc.frequency.setValueAtTime(880, now);
+            osc.frequency.setValueAtTime(1320, now + 0.08);
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.25, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+            osc.connect(gain).connect(audioCtx.destination);
+            osc.start(now); osc.stop(now + 0.3);
+        }
+    } catch(e) {}
+}
+
+// ============================================================
+// SECTION 4: PARTICLE SYSTEM
+// ============================================================
+const particles = [];
+
+function spawnParticles(pos, color, count, speed) {
+    for (let i = 0; i < count; i++) {
+        const geo = new THREE.SphereGeometry(0.04 + Math.random()*0.04, 4, 4);
+        const mat = new THREE.MeshBasicMaterial({ color: color });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(pos);
+        scene.add(mesh);
+        particles.push({
+            mesh: mesh,
+            vel: new THREE.Vector3(
+                (Math.random()-0.5)*speed,
+                Math.random()*speed*0.8 + speed*0.2,
+                (Math.random()-0.5)*speed
+            ),
+            life: 0.6 + Math.random()*0.4,
+            age: 0
+        });
+    }
+}
+
+function updateParticles(dt) {
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.age += dt;
+        if (p.age >= p.life) {
+            scene.remove(p.mesh);
+            p.mesh.geometry.dispose();
+            p.mesh.material.dispose();
+            particles.splice(i, 1);
+            continue;
+        }
+        p.vel.y -= 12 * dt;
+        p.mesh.position.addScaledVector(p.vel, dt);
+        const s = 1 - (p.age / p.life);
+        p.mesh.scale.setScalar(s);
+        p.mesh.material.opacity = s;
+    }
+}
+
+// ============================================================
+// SECTION 5: THREE.JS SETUP
+// ============================================================
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB);
+scene.fog = new THREE.FogExp2(0x87CEEB, 0.012);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 200);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0x6688cc, 0.5);
+scene.add(ambientLight);
+
+const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x446633, 0.4);
+scene.add(hemiLight);
+
+const dirLight = new THREE.DirectionalLight(0xffeedd, 0.9);
+dirLight.position.set(25, 40, 20);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 2048;
+dirLight.shadow.mapSize.height = 2048;
+dirLight.shadow.camera.near = 1;
+dirLight.shadow.camera.far = 100;
+dirLight.shadow.camera.left = -45;
+dirLight.shadow.camera.right = 45;
+dirLight.shadow.camera.top = 45;
+dirLight.shadow.camera.bottom = -45;
+dirLight.shadow.bias = -0.001;
+scene.add(dirLight);
+
+// Sky gradient dome
+(function createSky(){
+    const skyGeo = new THREE.SphereGeometry(90, 32, 16);
+    const skyMat = new THREE.ShaderMaterial({
+        uniforms: {
+            topColor: { value: new THREE.Color(0x3366cc) },
+            bottomColor: { value: new THREE.Color(0xc8e6ff) },
+            offset: { value: 10 }, exponent: { value: 0.5 }
+        },
+        vertexShader: `varying vec3 vWorldPos;
+            void main(){ vec4 wp=modelMatrix*vec4(position,1.0); vWorldPos=wp.xyz;
+            gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+        fragmentShader: `uniform vec3 topColor; uniform vec3 bottomColor;
+            uniform float offset; uniform float exponent; varying vec3 vWorldPos;
+            void main(){ float h=normalize(vWorldPos+offset).y;
+            gl_FragColor=vec4(mix(bottomColor,topColor,max(pow(max(h,0.0),exponent),0.0)),1.0);}`,
+        side: THREE.BackSide
+    });
+    scene.add(new THREE.Mesh(skyGeo, skyMat));
+})();
+
+// Resize handler
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ============================================================
+// SECTION 6: WORLD BUILDING
+// ============================================================
+const collidables = [];   // { mesh, box, type }
+const collectibles = [];  // { mesh, collected }
+
+function makeMat(color, roughness) {
+    return new THREE.MeshStandardMaterial({ color, roughness: roughness||0.7, metalness: 0.1 });
+}
+
+function addBox(w,h,d,x,y,z,color,type) {
+    const geo = new THREE.BoxGeometry(w,h,d);
+    const mesh = new THREE.Mesh(geo, makeMat(color));
+    mesh.position.set(x,y,z);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    scene.add(mesh);
+    const entry = { mesh, box: new THREE.Box3().setFromObject(mesh), type: type||'wall' };
+    collidables.push(entry);
+    return entry;
+}
+
+function addCylinder(rT,rB,h,x,y,z,color,segs,type) {
+    const geo = new THREE.CylinderGeometry(rT,rB,h,segs||12);
+    const mesh = new THREE.Mesh(geo, makeMat(color));
+    mesh.position.set(x,y,z);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    scene.add(mesh);
+    const entry = { mesh, box: new THREE.Box3().setFromObject(mesh), type: type||'wall' };
+    collidables.push(entry);
+    return entry;
+}
+
+function buildWorld() {
+    // --- Ground ---
+    addBox(60, 1, 60, 0, -0.5, 0, 0x4CAF50, 'ground');
+
+    // --- Boundary Walls (tall, purple) ---
+    addBox(60, 8, 1, 0, 4, -30, 0x7B1FA2, 'wall');
+    addBox(60, 8, 1, 0, 4, 30, 0x7B1FA2, 'wall');
+    addBox(1, 8, 60, -30, 4, 0, 0x7B1FA2, 'wall');
+    addBox(1, 8, 60, 30, 4, 0, 0x7B1FA2, 'wall');
+
+    // --- Central Pillars (climbing towers) ---
+    addCylinder(0.8, 0.8, 6, -3, 3, -3, 0xE91E63, 10, 'wall');
+    addCylinder(0.8, 0.8, 6, 3, 3, -3, 0xE91E63, 10, 'wall');
+    addCylinder(0.8, 0.8, 6, -3, 3, 3, 0xE91E63, 10, 'wall');
+    addCylinder(0.8, 0.8, 6, 3, 3, 3, 0xE91E63, 10, 'wall');
+
+    // Platform on top of pillars
+    addBox(8, 0.4, 8, 0, 6.2, 0, 0xFF9800, 'platform');
+
+    // --- Trees ---
+    function addTree(x, z, trunkH, leafR) {
+        addCylinder(0.35, 0.45, trunkH, x, trunkH/2, z, 0x795548, 8, 'wall');
+        // Foliage (sphere approximated by cylinder for simpler collision)
+        const fGeo = new THREE.SphereGeometry(leafR, 8, 6);
+        const fMesh = new THREE.Mesh(fGeo, makeMat(0x2E7D32));
+        fMesh.position.set(x, trunkH + leafR*0.6, z);
+        fMesh.castShadow = true;
+        scene.add(fMesh);
+        collidables.push({ mesh: fMesh, box: new THREE.Box3().setFromObject(fMesh), type: 'foliage' });
+    }
+    addTree(-12, -12, 5, 2.5);
+    addTree(14, -10, 6, 3);
+    addTree(-15, 10, 4.5, 2);
+    addTree(10, 15, 7, 3.2);
+    addTree(-8, 18, 5, 2.2);
+    addTree(20, -18, 5.5, 2.8);
+
+    // --- Ramps ---
+    function addRamp(x, z, rotY, w, h, d, color) {
+        const geo = new THREE.BoxGeometry(w, h, d);
+        const mesh = new THREE.Mesh(geo, makeMat(color || 0xFF5722));
+        mesh.position.set(x, h/2, z);
+        mesh.rotation.y = rotY;
+        // Tilt it
+        mesh.rotation.x = -0.35;
+        mesh.position.y = h/2 + 0.5;
+        mesh.castShadow = true; mesh.receiveShadow = true;
+        scene.add(mesh);
+        mesh.updateMatrixWorld(true);
+        collidables.push({ mesh, box: new THREE.Box3().setFromObject(mesh), type: 'ramp' });
+    }
+    addRamp(-8, -6, 0, 3, 0.4, 5, 0xFF5722);
+    addRamp(8, 6, Math.PI, 3, 0.4, 5, 0xFF5722);
+    addRamp(0, -15, Math.PI/2, 3, 0.4, 5, 0xFF9800);
+
+    // --- Floating Platforms ---
+    addBox(4, 0.5, 4, -10, 3, 0, 0x00BCD4, 'platform');
+    addBox(4, 0.5, 4, 10, 4, 0, 0x00BCD4, 'platform');
+    addBox(3, 0.5, 3, 0, 5, -12, 0x9C27B0, 'platform');
+    addBox(3, 0.5, 3, 0, 7, -18, 0x9C27B0, 'platform');
+    addBox(5, 0.5, 5, -18, 2.5, -18, 0x4CAF50, 'platform');
+    addBox(3, 0.5, 3, 18, 5, 18, 0xFFEB3B, 'platform');
+    addBox(4, 0.5, 4, -20, 4, 15, 0x00BCD4, 'platform');
+    addBox(3, 0.5, 3, 20, 3, -8, 0x9C27B0, 'platform');
+
+    // --- Stepping Stones (small platforms at various heights) ---
+    for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2;
+        const r = 22;
+        addBox(2, 0.4, 2, Math.cos(angle)*r, 1.5 + i*0.8, Math.sin(angle)*r, 
+              [0xF44336,0x2196F3,0x4CAF50,0xFFEB3B,0x9C27B0,0xFF9800][i], 'platform');
+    }
+
+    // --- Wall climbing structures ---
+    addBox(1, 10, 6, -22, 5, 0, 0x607D8B, 'wall');
+    addBox(6, 10, 1, 0, 5, 22, 0x607D8B, 'wall');
+    addBox(1, 8, 5, 22, 4, -15, 0x607D8B, 'wall');
+
+    // --- L-shaped obstacle ---
+    addBox(6, 3, 1, -15, 1.5, -5, 0x795548, 'wall');
+    addBox(1, 3, 6, -18, 1.5, -2, 0x795548, 'wall');
+
+    // --- Bananas / Collectibles ---
+    const bananaPositions = [
+        [0, 7.5, 0],       // On central platform
+        [-10, 4.5, 0],     // On floating platform
+        [10, 5.5, 0],      // On floating platform
+        [0, 6.5, -12],     // On floating platform
+        [0, 8.5, -18],     // Higher floating platform
+        [-18, 4, -18],     // Corner platform
+        [18, 6.5, 18],     // High corner
+        [-20, 5.5, 15],    // Side platform
+        [20, 4.5, -8],     // Side platform
+        [-12, 7, -12],     // Tree top
+        [14, 8, -10],      // Tree top
+        [10, 9, 15],       // Tree top
+        [-8, 6.5, 18],     // Tree top
+        [22, 3.5, 0],      // Near stepping stones
+        [-22, 6, 0],       // Wall climb reward
+        [0, 11, 22],       // Wall top
+    ];
+
+    const bananaGeo = new THREE.SphereGeometry(0.3, 8, 6);
+    // Make them slightly elongated
+    bananaGeo.scale(1, 1.4, 0.8);
+    const bananaMat = new THREE.MeshStandardMaterial({ 
+        color: 0xFFD700, emissive: 0x664400, emissiveIntensity: 0.3, roughness: 0.3, metalness: 0.5 
+    });
+
+    bananaPositions.forEach(p => {
+        const mesh = new THREE.Mesh(bananaGeo, bananaMat.clone());
+        mesh.position.set(p[0], p[1], p[2]);
+        mesh.castShadow = true;
+        scene.add(mesh);
+        collectibles.push({ mesh, collected: false, baseY: p[1] });
+    });
+    totalBananas = collectibles.length;
+
+    // --- Decorative elements (non-collidable) ---
+    // Small rocks
+    for (let i = 0; i < 20; i++) {
+        const rGeo = new THREE.DodecahedronGeometry(0.2 + Math.random()*0.3, 0);
+        const rMesh = new THREE.Mesh(rGeo, makeMat(0x888888, 0.9));
+        rMesh.position.set((Math.random()-0.5)*50, 0.1, (Math.random()-0.5)*50);
+        rMesh.rotation.set(Math.random()*6, Math.random()*6, Math.random()*6);
+        rMesh.receiveShadow = true;
+        scene.add(rMesh);
+    }
+}
+
+buildWorld();
+
+// ============================================================
+// SECTION 7: HAND VISUALS
+// ============================================================
+function createHandMeshes() {
+    const lGeo = new THREE.SphereGeometry(0.18, 10, 8);
+    const lMat = new THREE.MeshStandardMaterial({ 
+        color: 0x4488ff, transparent: true, opacity: 0.7, emissive: 0x112244, roughness: 0.4 
+    });
+    hands.left.mesh = new THREE.Mesh(lGeo, lMat);
+    hands.left.mesh.visible = false;
+    scene.add(hands.left.mesh);
+
+    const rGeo = new THREE.SphereGeometry(0.18, 10, 8);
+    const rMat = new THREE.MeshStandardMaterial({ 
+        color: 0xff4444, transparent: true, opacity: 0.7, emissive: 0x441111, roughness: 0.4 
+    });
+    hands.right.mesh = new THREE.Mesh(rGeo, rMat);
+    hands.right.mesh.visible = false;
+    scene.add(hands.right.mesh);
+}
+createHandMeshes();
+
+// ============================================================
+// SECTION 8: INPUT HANDLING
+// ============================================================
+document.addEventListener('mousemove', (e) => {
+    if (gameState !== 'playing' || !document.pointerLockElement) return;
+    input.dx = e.movementX || 0;
+    input.dy = e.movementY || 0;
+    input.yaw -= input.dx * 0.002;
+    input.pitch -= input.dy * 0.002;
+    input.pitch = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, input.pitch));
+});
+
+document.addEventListener('mousedown', (e) => {
+    if (gameState === 'paused' && document.pointerLockElement) {
+        // Resume from pause
+        gameState = 'playing';
+        document.getElementById('pauseMenu').style.display = 'none';
+        return;
+    }
+    if (gameState !== 'playing') return;
+    if (e.button === 0) input.leftDown = true;
+    if (e.button === 2) input.rightDown = true;
+});
+
+document.addEventListener('mouseup', (e) => {
+    if (e.button === 0) { input.leftDown = false; releaseHand('left'); }
+    if (e.button === 2) { input.rightDown = false; releaseHand('right'); }
+});
+
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+        e.preventDefault();
+        if (gameState === 'playing' || gameState === 'paused') {
+            resetPlayer();
+        }
+    }
+    if (e.code === 'Escape') {
+        if (gameState === 'playing') {
+            gameState = 'paused';
+            document.exitPointerLock();
+            document.getElementById('pauseMenu').style.display = 'flex';
+        }
+    }
+});
+
+document.addEventListener('pointerlockchange', () => {
+    if (!document.pointerLockElement && gameState === 'playing') {
+        gameState = 'paused';
+        document.getElementById('pauseMenu').style.display = 'flex';
+    }
+});
+
+// Start button
+document.getElementById('startBtn').addEventListener('click', () => {
+    initAudio();
+    document.getElementById('instructions').style.display = 'none';
+    document.getElementById('hud').style.display = 'block';
+    renderer.domElement.requestPointerLock();
+    gameState = 'playing';
+    timerStart = performance.now();
+    resetPlayer();
+});
+
+// Restart button
+document.getElementById('restartBtn').addEventListener('click', () => {
+    document.getElementById('winScreen').style.display = 'none';
+    collectibles.forEach(c => { c.collected = false; c.mesh.visible = true; });
+    score = 0;
+    timerStart = performance.now();
+    resetPlayer();
+    renderer.domElement.requestPointerLock();
+    gameState = 'playing';
+});
+
+// ============================================================
+// SECTION 9: PHYSICS & COLLISION
+// ============================================================
+const _ray = new THREE.Raycaster();
+const _v1 = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
+const _v3 = new THREE.Vector3();
+
+function getForward() {
+    _v1.set(0, 0, -1);
+    _v1.applyAxisAngle(new THREE.Vector3(0,1,0), input.yaw);
+    return _v1.clone();
+}
+
+function getRight() {
+    _v1.set(1, 0, 0);
+    _v1.applyAxisAngle(new THREE.Vector3(0,1,0), input.yaw);
+    return _v1.clone();
+}
+
+function getHandWorldPos(side) {
+    const fwd = getForward();
+    const right = getRight();
+    const offset = side === 'left' ? -0.5 : 0.5;
+    const pos = player.pos.clone();
+    pos.y += 0.5; // shoulder height
+    pos.addScaledVector(right, offset);
+    pos.addScaledVector(fwd, 0.8); // forward reach
+    return pos;
+}
+
+function findNearestSurface(handPos) {
+    let bestDist = CFG.handReach;
+    let bestPoint = null;
+    let bestNormal = null;
+
+    for (const col of collidables) {
+        col.mesh.updateMatrixWorld();
+        const closestPt = new THREE.Vector3();
+        col.box.clampPoint(handPos, closestPt);
+        const dist = handPos.distanceTo(closestPt);
+
+        if (dist < bestDist) {
+            bestDist = dist;
+            bestPoint = closestPt.clone();
+
+            // Approximate normal: direction from closest point on box to hand
+            const center = new THREE.Vector3();
+            col.box.getCenter(center);
+            const size = new THREE.Vector3();
+            col.box.getSize(size);
+
+            // Better normal approximation
+            const local = closestPt.clone().sub(center);
+            const nx = Math.abs(local.x) / (size.x * 0.5 + 0.001);
+            const ny = Math.abs(local.y) / (size.y * 0.5 + 0.001);
+            const nz = Math.abs(local.z) / (size.z * 0.5 + 0.001);
+
+            if (nx > ny && nx > nz) {
+                bestNormal = new THREE.Vector3(Math.sign(local.x), 0, 0);
+            } else if (ny > nx && ny > nz) {
+                bestNormal = new THREE.Vector3(0, Math.sign(local.y), 0);
+            } else {
+                bestNormal = new THREE.Vector3(0, 0, Math.sign(local.z));
+            }
+
+            // If hand is inside or very close, use direction away from center
+            if (dist < 0.05) {
+                bestNormal = handPos.clone().sub(center).normalize();
+                if (bestNormal.length() < 0.01) bestNormal.set(0, 1, 0);
+            }
+        }
+    }
+    return { point: bestPoint, normal: bestNormal, dist: bestDist };
+}
+
+function grabHand(side) {
+    const hand = hands[side];
+    if (hand.grabbing) return;
+
+    const handPos = getHandWorldPos(side);
+    const result = findNearestSurface(handPos);
+
+    if (result.point) {
+        hand.grabbing = true;
+        hand.contactPoint = result.point;
+        hand.normal = result.normal;
+        hand.lastMouse = { x: input.dx, y: input.dy };
+
+        // Position hand mesh
+        hand.mesh.position.copy(result.point);
+        hand.mesh.visible = true;
+        hand.mesh.material.emissiveIntensity = 0.8;
+
+        // Particles on grab
+        const pColor = side === 'left' ? 0x4488ff : 0xff4444;
+        spawnParticles(result.point, pColor, 5, 2);
+    }
+}
+
+function releaseHand(side) {
+    const hand = hands[side];
+    if (!hand.grabbing) return;
+    hand.grabbing = false;
+    hand.contactPoint = null;
+    hand.normal = null;
+    hand.mesh.visible = false;
+    hand.mesh.material.emissiveIntensity = 0.3;
+}
+
+function applyPushForce(side, dx, dy) {
+    const hand = hands[side];
+    if (!hand.grabbing || !hand.contactPoint) return;
+
+    const camRight = getRight();
+    const camUp = new THREE.Vector3(0, 1, 0);
+    const camFwd = getForward();
+
+    // Mouse movement mapped to world directions
+    const pushDir = new THREE.Vector3();
+    pushDir.addScaledVector(camRight, -dx * 0.08);
+    pushDir.addScaledVector(camUp, dy * 0.08);
+
+    const pushMag = pushDir.length();
+    if (pushMag < 0.001) return;
+
+    // If pushing into surface, reflect along normal
+    if (hand.normal) {
+        const dotN = pushDir.dot(hand.normal);
+        if (dotN < 0) {
+            // Pushing into wall - redirect along normal and tangent
+            pushDir.addScaledVector(hand.normal, -dotN * 1.5);
+        }
+    }
+
+    const force = Math.min(pushMag * CFG.pushMultiplier, CFG.maxPushSpeed);
+    pushDir.normalize().multiplyScalar(force);
+
+    player.vel.add(pushDir);
+
+    // Sound proportional to force
+    if (force > 2) playSound('push');
+
+    // Particles
+    const pColor = side === 'left' ? 0x4488ff : 0xff4444;
+    if (force > 3) spawnParticles(hand.contactPoint, pColor, Math.min(Math.floor(force/2), 12), force * 0.3);
+}
+
+function resolveCollisions() {
+    const pBox = new THREE.Box3(
+        new THREE.Vector3(player.pos.x - CFG.playerRadius, player.pos.y, player.pos.z - CFG.playerRadius),
+        new THREE.Vector3(player.pos.x + CFG.playerRadius, player.pos.y + CFG.playerHeight, player.pos.z + CFG.playerRadius)
+    );
+
+    player.grounded = false;
+
+    for (const col of collidables) {
+        if (!pBox.intersectsBox(col.box)) continue;
+
+        const center = new THREE.Vector3();
+        col.box.getCenter(center);
+        const size = new THREE.Vector3();
+        col.box.getSize(size);
+
+        // Calculate overlap on each axis
+        const overlapX = (CFG.playerRadius + size.x/2) - Math.abs(player.pos.x - center.x);
+        const overlapYTop = (player.pos.y + CFG.playerHeight) - col.box.min.y;
+        const overlapYBot = col.box.max.y - player.pos.y;
+        const overlapZ = (CFG.playerRadius + size.z/2) - Math.abs(player.pos.z - center.z);
+
+        // Only resolve if actually overlapping
+        if (overlapX <= 0 || overlapZ <= 0) continue;
+        
+        const overlapY = Math.min(overlapYTop, overlapYBot);
+        if (overlapY <= 0) continue;
+
+        // Find minimum penetration axis
+        const minOverlap = Math.min(overlapX, overlapY, overlapZ);
+
+        if (minOverlap === overlapY) {
+            if (overlapYTop < overlapYBot) {
+                // Hitting ceiling
+                player.pos.y = col.box.min.y - CFG.playerHeight;
+                if (player.vel.y > 0) player.vel.y = 0;
+            } else {
+                // Standing on top (grounded)
+                player.pos.y = col.box.max.y;
+                if (player.vel.y < 0) {
+                    if (player.vel.y < -5 && !player.wasGrounded) {
+                        playSound('land');
+                        spawnParticles(player.pos.clone().setY(col.box.max.y), 0xffffff, 8, 3);
+                    }
+                    player.vel.y = 0;
+                }
+                player.grounded = true;
+            }
+        } else if (minOverlap === overlapX) {
+            if (player.pos.x < center.x) {
+                player.pos.x = col.box.min.x - CFG.playerRadius;
+            } else {
+                player.pos.x = col.box.max.x + CFG.playerRadius;
+            }
+            player.vel.x *= -0.1; // slight bounce
+        } else {
+            if (player.pos.z < center.z) {
+                player.pos.z = col.box.min.z - CFG.playerRadius;
+            } else {
+                player.pos.z = col.box.max.z + CFG.playerRadius;
+            }
+            player.vel.z *= -0.1;
+        }
+
+        // Update bounding box after resolution
+        pBox.set(
+            new THREE.Vector3(player.pos.x - CFG.playerRadius, player.pos.y, player.pos.z - CFG.playerRadius),
+            new THREE.Vector3(player.pos.x + CFG.playerRadius, player.pos.y + CFG.playerHeight, player.pos.z + CFG.playerRadius)
+        );
+    }
+}
+
+function updatePhysics(dt) {
+    // Clamp dt to prevent physics explosions
+    dt = Math.min(dt, 0.05);
+
+    // Handle grabbing
+    if (input.leftDown && !hands.left.grabbing) grabHand('left');
+    if (input.rightDown && !hands.right.grabbing) grabHand('right');
+
+    // Apply push forces from mouse movement
+    if (hands.left.grabbing) applyPushForce('left', input.dx, input.dy);
+    if (hands.right.grabbing) applyPushForce('right', input.dx, input.dy);
+
+    // Gravity
+    player.vel.y += CFG.gravity * dt;
+
+    // Air drag / ground friction
+    if (player.grounded) {
+        player.vel.x *= Math.pow(CFG.groundFriction, dt * 60);
+        player.vel.z *= Math.pow(CFG.groundFriction, dt * 60);
+    } else {
+        player.vel.x *= Math.pow(CFG.airDrag, dt * 60);
+        player.vel.z *= Math.pow(CFG.airDrag, dt * 60);
+        player.vel.y *= Math.pow(0.999, dt * 60);
+    }
+
+    // Integrate position
+    player.pos.addScaledVector(player.vel, dt);
+
+    // Resolve collisions
+    resolveCollisions();
+
+    // Fall reset
+    if (player.pos.y < CFG.fallResetY) {
+        resetPlayer();
+    }
+
+    // Update hand mesh positions while grabbing
+    ['left', 'right'].forEach(side => {
+        const hand = hands[side];
+        if (hand.grabbing && hand.mesh.visible) {
+            // Pulse effect
+            const pulse = 1 + Math.sin(performance.now() * 0.01) * 0.1;
+            hand.mesh.scale.setScalar(pulse);
+        }
+    });
+
+    player.wasGrounded = player.grounded;
+
+    // Reset per-frame mouse delta
+    input.dx = 0;
+    input.dy = 0;
+}
+
+function resetPlayer() {
+    player.pos.copy(CFG.spawnPos);
+    player.vel.set(0, 0, 0);
+    player.grounded = false;
+    releaseHand('left');
+    releaseHand('right');
+    input.leftDown = false;
+    input.rightDown = false;
+}
+
+// ============================================================
+// SECTION 10: COLLECTIBLES
+// ============================================================
+function updateCollectibles(time) {
+    collectibles.forEach((c, i) => {
+        if (c.collected) return;
+
+        // Bobbing animation
+        c.mesh.position.y = c.baseY + Math.sin(time * 2 + i) * 0.15;
+        c.mesh.rotation.y = time * 1.5 + i;
+
+        // Check collection (distance from player)
+        const dist = player.pos.distanceTo(c.mesh.position);
+        if (dist < 1.2) {
+            c.collected = true;
+            c.mesh.visible = false;
+            score++;
+            playSound('collect');
+            spawnParticles(c.mesh.position.clone(), 0xFFD700, 15, 5);
+
+            // Check win
+            if (score >= totalBananas) {
+                gameState = 'won';
+                document.exitPointerLock();
+                const elapsed = (performance.now() - timerStart) / 1000;
+                document.getElementById('finalTime').textContent = `Time: ${formatTime(elapsed)}`;
+                document.getElementById('finalScore').textContent = `Bananas: ${score}/${totalBananas}`;
+                document.getElementById('winScreen').style.display = 'flex';
+            }
+        }
+    });
+}
+
+// ============================================================
+// SECTION 11: CAMERA UPDATE
+// ============================================================
+function updateCamera(dt) {
+    // Target camera position
+    const targetPos = player.pos.clone();
+    targetPos.y += CFG.eyeHeight;
+
+    // Head bob when grounded and moving
+    if (player.grounded) {
+        const speed = Math.sqrt(player.vel.x * player.vel.x + player.vel.z * player.vel.z);
+        if (speed > 0.5) {
+            targetPos.y += Math.sin(performance.now() * 0.001 * CFG.bobSpeed) * CFG.bobAmount * Math.min(speed * 0.3, 1);
+        }
+    }
+
+    // Smooth camera follow
+    const smoothFactor = 1 - Math.exp(-CFG.cameraSmooth * dt);
+    camera.position.lerp(targetPos, smoothFactor);
+
+    // Camera rotation
+    const euler = new THREE.Euler(input.pitch, input.yaw, 0, 'YXZ');
+    camera.quaternion.slerp(new THREE.Quaternion().setFromEuler(euler), smoothFactor);
+}
+
+// ============================================================
+// SECTION 12: UI UPDATES
+// ============================================================
+function formatTime(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${String(m).padStart(2,'0')}:${s.toFixed(1).padStart(4,'0')}`;
+}
+
+function updateUI() {
+    const speed = player.vel.length();
+    document.getElementById('velPanel').innerHTML = 
+        `Speed: <b>${speed.toFixed(1)}</b> m/s<br>` +
+        `Vel: (${player.vel.x.toFixed(1)}, ${player.vel.y.toFixed(1)}, ${player.vel.z.toFixed(1)})`;
+
+    document.getElementById('scorePanel').textContent = `🍌 ${score} / ${totalBananas}`;
+
+    if (gameState === 'playing') {
+        elapsedTime = (performance.now() - timerStart) / 1000;
+    }
+    document.getElementById('timerPanel').textContent = formatTime(elapsedTime);
+
+    const statusEl = document.getElementById('statusPanel');
+    let statusText = player.grounded ? '🟢 Grounded' : '🔴 Airborne';
+    if (hands.left.grabbing) statusText += ' | L✊';
+    if (hands.right.grabbing) statusText += ' | R✊';
+    statusEl.textContent = statusText;
+
+    const leftInd = document.getElementById('leftInd');
+    const rightInd = document.getElementById('rightInd');
+    leftInd.classList.toggle('grabbed', hands.left.grabbing);
+    rightInd.classList.toggle('grabbed', hands.right.grabbing);
+    leftInd.textContent = hands.left.grabbing ? 'L ✊ GRABBED' : 'L Hand';
+    rightInd.textContent = hands.right.grabbing ? 'R ✊ GRABBED' : 'R Hand';
+}
+
+// ============================================================
+// SECTION 13: MAIN GAME LOOP
+// ============================================================
+let lastTime = performance.now();
+
+function gameLoop(currentTime) {
+    requestAnimationFrame(gameLoop);
+
+    const dt = (currentTime - lastTime) / 1000;
+    lastTime = currentTime;
+
+    if (gameState === 'playing') {
+        updatePhysics(dt);
+        updateCamera(dt);
+        updateCollectibles(currentTime / 1000);
+        updateParticles(dt);
+        updateUI();
+    } else if (gameState === 'paused') {
+        // Still render but don't update physics
+        updateParticles(dt);
+    } else if (gameState === 'menu') {
+        // Slowly rotate camera for menu
+        camera.position.set(
+            Math.sin(currentTime * 0.0003) * 15,
+            8 + Math.sin(currentTime * 0.0005) * 2,
+            Math.cos(currentTime * 0.0003) * 15
+        );
+        camera.lookAt(0, 3, 0);
+    }
+
+    renderer.render(scene, camera);
+}
+
+// Start loop
+requestAnimationFrame(gameLoop);
+
+// ============================================================
+// SECTION 14: INITIALIZATION
+// ============================================================
+// Set initial camera for menu
+camera.position.set(15, 8, 15);
+camera.lookAt(0, 3, 0);
+
+// Prevent scrolling
+document.addEventListener('wheel', e => e.preventDefault(), { passive: false });
+
+console.log('%c🦍 Gorilla Tag Desktop Edition loaded!', 'color: #FFD700; font-size: 16px; font-weight: bold;');
+console.log(`%c${totalBananas} bananas placed. Good luck!`, 'color: #4CAF50; font-size: 14px;');
+</script>
+</body>
+</html>
